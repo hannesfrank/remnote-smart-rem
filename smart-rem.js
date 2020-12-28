@@ -165,7 +165,10 @@ async function f() {
     if (isSmartRem(el)) {
       await evaluateSmartRem(el);
     } else {
-      resetRem(el);
+      if (el.remSmartResult) {
+        el.remSmartResult.remove();
+        delete el.remSmartResult;
+      }
     }
   }
 
@@ -187,7 +190,7 @@ async function f() {
   }
 
   // This function is run periodically on all rem.
-  async function prepareLifeCylce(el) {
+  async function prepareLifeCycle(el) {
     if (el.remLifeCycleHooks !== undefined) {
       // Old rem: hooks already installed
       return;
@@ -196,12 +199,10 @@ async function f() {
     await onInsert(el);
 
     // TODO: Focus in should run change handler
-    el.remLifeCycleHooks.focusin = el.addEventListener("focusin", (event) =>
-      onFocusIn(el, event)
-    );
-    el.remLifeCycleHooks.focusout = el.addEventListener("focusout", (event) =>
-      onFocusOut(el, event)
-    );
+    el.remLifeCycleHooks.focusin = (event) => onFocusIn(el, event);
+    el.addEventListener("focusin", el.remLifeCycleHooks.focusin);
+    el.remLifeCycleHooks.focusout = (event) => onFocusOut(el, event);
+    el.addEventListener("focusout", el.remLifeCycleHooks.focusout);
     // TODO: Change handler or focusOut should check if it is a smartRem or not
 
     // TODO: Monitor new rems or when a rem is turned into a smart rem
@@ -248,7 +249,7 @@ async function f() {
 
     let rems = await findAllRem();
     rems.map(resetRem);
-    await Promise.all(rems.map(prepareLifeCylce));
+    await Promise.all(rems.map(prepareLifeCycle));
 
     // FIXME: This is run to detect new rem. I have not hooked up the created hook yet.
     setInterval(async function () {
