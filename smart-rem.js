@@ -1,29 +1,40 @@
 async function f() {
-  REM_ID_LENGTH = 17;
+  const REM_ID_LENGTH = 17;
+  const SMART_REM_PREFIX = ">>>";
+
+  function matchRegex(regex) {
+    return (el) => {
+      const smartCommandText = el.remData.key[0]
+        .slice(SMART_REM_PREFIX.length)
+        .trim();
+      return regex.exec(smartCommandText);
+    };
+  }
 
   const smartCommands = [
     {
-      matcher: /^=(.+)/,
-      handler: async match => {
+      matcher: matchRegex(/^=(.*)/),
+      handler: async (match, el) => {
+        console.info(el.remData);
         const result = eval(match[1]);
         // console.info('Calc: ', match, ' = ', result);
         return result;
-      }
+      },
     },
     {
-      matcher: /^spotify:\s*(.+)/,
-      handler: async match =>
-        `<iframe src="https://open.spotify.com/embed/${match[1]}" width="300" height="380"></iframe>`
+      matcher: matchRegex(/^spotify:\s*(.+)/),
+      handler: async (match) =>
+        `<iframe src="https://open.spotify.com/embed/${match[1]}" width="300" height="380"></iframe>`,
     },
     {
-      matcher: /^embed:\s*(.+)/,
-      handler: async match =>
-        `<iframe src="https://${match[1]}" width="750" height="500"></iframe>`
+      matcher: matchRegex(/^embed:\s*(.+)/),
+      handler: async (match) =>
+        `<iframe src="https://${match[1]}" width="750" height="500"></iframe>`,
     },
     {
-      matcher: /^weather:\s*(.+)/,
-      handler: async match =>
-        `<img src="https://wttr.in/${match[1]}_tpq0.png" />`
+      matcher: matchRegex(/^weather:\s*(.+)/),
+      handler: async (match) =>
+        `<img src="https://wttr.in/${match[1]}_tpq0.png" />`,
       /* handler: async match => {
         const resp = await fetch("https://wttr.in/Dresden");
         const text = await resp.text();
@@ -32,65 +43,65 @@ async function f() {
     }*/
     },
     {
-      matcher: /^chucknorris/,
-      handler: async match => {
+      matcher: matchRegex(/^chucknorris/),
+      handler: async (match) => {
         const resp = await fetch("https://api.chucknorris.io/jokes/random");
         const json = await resp.json();
         return `<p>🧔 ${json.value}</p>`;
-      }
+      },
     },
     {
-      matcher: /^current ip/,
-      handler: async match => {
+      matcher: matchRegex(/^current ip/),
+      handler: async (match) => {
         const resp = await fetch("https://api.ipify.org/?format=json");
         const json = await resp.json();
         // return `<p>💻 ${json.ip}</p>`;
         return `<p>💻 1.3.3.7</p>`;
-      }
+      },
     },
     {
-      matcher: /^zip code:\s*(.+)/,
-      handler: async match => {
+      matcher: matchRegex(/^zip code:\s*(.+)/),
+      handler: async (match) => {
         const resp = await fetch(`https://api.zippopotam.us/${match[1]}`);
         const json = await resp.json();
         if (!json.places) {
           return `<p>Not found!</p>`;
         }
         return `<p>${json.places[0]["place name"]}, ${json.country}</p>`;
-      }
+      },
     },
     {
-      matcher: /^xkcd/,
-      handler: async match => {
+      matcher: matchRegex(/^xkcd/),
+      handler: async (match) => {
         console.warn("xkcd");
         const resp = await fetch("https://xkcd.now.sh/?comic=latest");
         const json = await resp.json();
         console.warn(json);
         return `<img src="${json.img}" />`;
-      }
+      },
     },
     {
-      matcher: /^html:\s*(.+)/,
-      handler: async match => {
+      matcher: matchRegex(/^html:\s*(.+)/),
+      handler: async (match) => {
         return `${match[1]}`;
-      }
+      },
     },
     {
-      matcher: /^markdown:\s*(.+)/s,
-      handler: async match => {
+      matcher: matchRegex(/^markdown:\s*(.+)/s),
+      handler: async (match) => {
         const markdown = match[1];
         console.warn("markdown", markdown);
         const html = new showdown.Converter({ tables: true }).makeHtml(
           markdown
         );
         return html;
-      }
+      },
     },
     {
-      matcher: /^regex matching the smart command/,
+      matcher: matchRegex(/^regex matching the smart command/),
       handler:
-        "async function taking the smart block content and returning result markup"
-    }
+        "async function taking the smart block content and returning result markup",
+    },
   ];
 
   function findAllRem() {
@@ -177,18 +188,18 @@ async function f() {
 
   // This function is run periodically on all rem.
   async function prepareLifeCylce(el) {
-    if (el.remLiveCycleHooks !== undefined) {
+    if (el.remLifeCycleHooks !== undefined) {
       // Old rem: hooks already installed
       return;
     }
-    el.remLiveCycleHooks = {};
+    el.remLifeCycleHooks = {};
     await onInsert(el);
 
     // TODO: Focus in should run change handler
-    el.remLiveCycleHooks.focusin = el.addEventListener("focusin", event =>
+    el.remLifeCycleHooks.focusin = el.addEventListener("focusin", (event) =>
       onFocusIn(el, event)
     );
-    el.remLiveCycleHooks.focusout = el.addEventListener("focusout", event =>
+    el.remLifeCycleHooks.focusout = el.addEventListener("focusout", (event) =>
       onFocusOut(el, event)
     );
     // TODO: Change handler or focusOut should check if it is a smartRem or not
@@ -213,10 +224,8 @@ async function f() {
   }
 
   async function evaluateSmartRem(el) {
-    // FIXME: Assume single string key for now
-    const smartCommandText = el.remData.key[0].slice(3).trim();
     for (const smartCommand of smartCommands) {
-      const match = smartCommand.matcher.exec(smartCommandText);
+      const match = smartCommand.matcher(el);
       if (match) {
         const result = await smartCommand.handler(match, el);
         setResult(el, result);
@@ -229,8 +238,8 @@ async function f() {
   Promise.all([
     import("https://unpkg.com/idb?module"),
     fetch("https://unpkg.com/showdown")
-      .then(response => response.text())
-      .then(text => Function(text))
+      .then((response) => response.text())
+      .then((text) => Function(text)),
     // Somehow this import does not work... I'll use builtin eval for now
     //fetch("https://unpkg.com/bigeval").then(response=>response.text()).then(text=>Function(text))
   ]).then(async ([idb, sd]) => {
@@ -242,7 +251,7 @@ async function f() {
     await Promise.all(rems.map(prepareLifeCylce));
 
     // FIXME: This is run to detect new rem. I have not hooked up the created hook yet.
-    setInterval(async function() {
+    setInterval(async function () {
       const rems = await findAllRem();
       await Promise.all(rems.map(prepareLifeCylce));
     }, 2000);
@@ -251,12 +260,12 @@ async function f() {
 
 function resetRem(el) {
   delete el.remData;
-  if (el.remLiveCycleHooks) {
-    for (const [event, hook] of Object.entries(el.remLiveCycleHooks)) {
+  if (el.remLifeCycleHooks) {
+    for (const [event, hook] of Object.entries(el.remLifeCycleHooks)) {
       el.removeEventListener(event, hook);
     }
   }
-  delete el.remLiveCycleHooks;
+  delete el.remLifeCycleHooks;
   if (el.remSmartResult) el.remSmartResult.remove();
 }
 
