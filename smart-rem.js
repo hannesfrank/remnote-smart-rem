@@ -15,10 +15,26 @@ async function f() {
     {
       matcher: matchRegex(/^=(.*)/),
       handler: async (match, el) => {
-        console.info(el.remData);
-        const result = eval(match[1]);
-        // console.info('Calc: ', match, ' = ', result);
-        return result;
+        const rawExpression = [...el.remData.key];
+        rawExpression[0] = match[1];
+        const resolvedVariables = await Promise.all(
+          rawExpression.map(async (part) => {
+            if (typeof part === "string") {
+              return part;
+            }
+            if (typeof part === "object" && part.i === "q") {
+              const rem = await db.get("quanta", part._id);
+              return rem.value;
+            }
+            return "??";
+          })
+        );
+
+        const expression = resolvedVariables.join("");
+        const result = eval(expression);
+
+        console.info("Calc: ", match, " = ", result);
+        return `<p>${expression} = </p><p>${result}</p>`;
       },
     },
     {
@@ -73,10 +89,8 @@ async function f() {
     {
       matcher: matchRegex(/^xkcd/),
       handler: async (match) => {
-        console.warn("xkcd");
         const resp = await fetch("https://xkcd.now.sh/?comic=latest");
         const json = await resp.json();
-        console.warn(json);
         return `<img src="${json.img}" />`;
       },
     },
@@ -154,8 +168,8 @@ async function f() {
   }
 
   // Rem is focused for editing
-  function onFocusIn(el) {
-    console.info("onFocusIn", el.id);
+  function onFocusIn(event) {
+    console.info("onFocusIn", event);
   }
 
   // Rem is unfocused
