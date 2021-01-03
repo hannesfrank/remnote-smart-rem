@@ -1,3 +1,137 @@
+// =============== Query explorations ================
+function remContent(rem) {
+  return [...rem.key, ...(rem.value || [])];
+}
+
+async function getRemText(remId, exploredRem = []) {
+  let rem = await db.get("quanta", remId);
+  if (!rem) return;
+
+  const richTextElementsText = await Promise.all(
+    rem.key.map(async (richTextElement) => {
+      // If the element is a string, juts return it
+      if (typeof richTextElement == "string") {
+        return richTextElement;
+        // If the element is a Rem Reference (i == "q"), then recursively get that Rem Reference's text.
+      } else if (
+        richTextElement.i == "q" &&
+        !exploredRem.includes(richTextElement._id)
+      ) {
+        return await getRemText(
+          richTextElement._id,
+          exploredRem.concat([richTextElement._id])
+        );
+      } else {
+        // If the Rem is some other rich text element, just take its .text property.
+        return richTextElement.text;
+      }
+    })
+  );
+  return richTextElementsText.join("");
+}
+
+async function makeRemContainer(rem) {
+  //const template = document.createElement("template");
+  //template.innerHTML = `<div class="sr-rem-container">${await getRemText(rem._id)}</div>`;
+  //return template.content.firstChild;
+  const text = await getRemText(rem._id);
+  return `<div class="sr-rem-container">${text}</div>`;
+}
+
+function hasReference(rem, refId) {
+  for (let part of remContent(rem)) {
+    if (typeof part === "object" && part.i === "q" && part._id === refId) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function hasTag(rem, tagId) {}
+
+/**
+ * returns query AST as a json object representing the postorder
+ */
+async function parseQuery(rawExpression) {
+  // TODO: I can be even more explicit with hasReference, hasTag and maybe date operators.
+  // This would play more nicely with not
+  const resolvedReferences = await Promise.all(
+    rawExpression.map(async (part) => {
+      if (typeof part === "string") {
+        return part;
+      }
+      if (typeof part === "object" && part.i === "q") {
+        return `"${part._id}"`;
+      }
+      return "??";
+    })
+  );
+
+  const queryStr = resolvedReferences.join("");
+  console.info("Query STR", queryStr);
+  const query = JSON.parse(queryStr);
+  console.info("Query AST", query);
+  return query;
+}
+
+async function resolveQuery(queryAST) {
+  if (queryAST.and) {
+    const remIds = queryAST.and;
+    console.info("and", remIds);
+    const result = [];
+    let cursor = await db.transaction("quanta").store.openCursor();
+
+    // There is an async iterator version which might make this more responsive
+    // for await (const cursor of tx.store) {
+    //   const rem = cursor.value;
+    //   if (remIds.every(remId => hasReference(rem, remId))) {
+    //     result.push(rem)
+    //   }
+    // }
+    while (cursor) {
+      const rem = cursor.value;
+      if (remIds.every((remId) => hasReference(rem, remId))) {
+        result.push(rem);
+      }
+      cursor = await cursor.continue();
+    }
+    console.warn("query result", result);
+    return result;
+  } else if (queryAST.or) {
+    const remIds = queryAST.or;
+    console.info("or", remIds);
+    const result = [];
+    let cursor = await db.transaction("quanta").store.openCursor();
+    while (cursor) {
+      const rem = cursor.value;
+      if (remIds.some((remId) => hasReference(rem, remId))) {
+        result.push(rem);
+      }
+      cursor = await cursor.continue();
+    }
+    console.warn("query result", result);
+    return result;
+  } else if (false && queryAST.not) {
+    const remIds = queryAST.not;
+
+    console.info("or", remIds);
+    const result = [];
+    let cursor = await db.transaction("quanta").store.openCursor();
+    while (cursor) {
+      const rem = cursor.value;
+      if (remIds.some((remId) => hasReference(rem, remId))) {
+        result.push(rem);
+      }
+      cursor = await cursor.continue();
+    }
+    console.warn("query result", result);
+    return result;
+  }
+  return [];
+}
+
+// ============= Smart Rem =================
+
 async function f() {
   const REM_ID_LENGTH = 17;
   const SMART_REM_PREFIX = ">>>";
@@ -12,6 +146,21 @@ async function f() {
   }
 
   const smartCommands = [
+    {
+      matcher: matchRegex(/^\s*query-rem-json:(.*)/),
+      handler: async (match, el) => {
+        const rawExpression = [...el.remData.key];
+        rawExpression[0] = match[1];
+        const query = await parseQuery(rawExpression);
+        const resultIncludingSelf = await resolveQuery(query);
+        const result = resultIncludingSelf.filter(
+          (rem) => rem._id !== el.remData._id
+        );
+        const remContainers = await Promise.all(result.map(makeRemContainer));
+
+        return `<p>${remContainers.join("\n")}</p>`;
+      },
+    },
     {
       matcher: matchRegex(/^=(.*)/),
       handler: async (match, el) => {
@@ -268,7 +417,7 @@ async function f() {
     // FIXME: This is run to detect new rem. I have not hooked up the created hook yet.
     setInterval(async function () {
       const rems = await findAllRem();
-      await Promise.all(rems.map(prepareLifeCylce));
+      await Promise.all(rems.map(prepareLifeCycle));
     }, 2000);
   });
 }
