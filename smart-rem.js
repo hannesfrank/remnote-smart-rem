@@ -132,6 +132,69 @@ async function resolveQuery(queryAST) {
   return [];
 }
 
+// ============= Common functions ==========
+
+function getRemMarkdown(remid) {
+  // TODO: implement
+  return getRemText(remId);
+}
+
+async function getRemText(remId, exploredRem = []) {
+  let rem = await db.get("quanta", remId);
+  if (!rem) return;
+
+  const richTextElementsText = await Promise.all(
+    rem.key.map(async (richTextElement) => {
+      // If the element is a string, juts return it
+      if (typeof richTextElement == "string") {
+        return richTextElement;
+        // If the element is a Rem Reference (i == "q"), then recursively get that Rem Reference's text.
+      } else if (
+        richTextElement.i == "q" &&
+        !exploredRem.includes(richTextElement._id)
+      ) {
+        return await getRemText(
+          richTextElement._id,
+          exploredRem.concat([richTextElement._id])
+        );
+      } else {
+        // If the Rem is some other rich text element, just take its .text property.
+        return richTextElement.text;
+      }
+    })
+  );
+  return richTextElementsText.join("");
+}
+
+async function getRemHTML(remId, exploredRem = []) {
+  let rem = await db.get("quanta", remId);
+  if (!rem) return;
+  const richTextElementsHTML = await Promise.all(
+    rem.key.map(async (richTextElement) => {
+      // If the element is a string, juts return it
+      if (typeof richTextElement == "string") {
+        return richTextElement;
+        // If the element is a Rem Reference (i == "q"), then recursively get that Rem Reference's text.
+      } else if (richTextElement.i == "q") {
+        return await getRemText(richTextElement._id);
+      } else if (richTextElement.i == "m") {
+        // TODO: There is much missing here: images, code blocks, latex
+        let html = richTextElement.text;
+        if (richTextElement.b) {
+          html = `<strong>${html}</strong>`;
+        }
+        if (richTextElement.l) {
+          html = `<em>${html}</em>`;
+        }
+        return html;
+      } else {
+        return richTextElement.text;
+      }
+    })
+  );
+  return richTextElementsHTML.join("");
+}
+
 // ============= Smart Rem =================
 
 // ---------- Smart Rem Util ---------------
@@ -303,6 +366,57 @@ async function f() {
         console.warn(text);
         return `${text}`;
     }*/
+    },
+    {
+      dependencies: [
+        "https://cdn.jsdelivr.net/npm/reveal.js/dist/reveal.js",
+        "https://cdn.jsdelivr.net/npm/reveal.js/dist/reveal.css",
+        "https://cdn.jsdelivr.net/npm/reveal.js/dist/theme/white.css",
+        //"https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.13.1/styles/zenburn.min.css",
+      ],
+      matcher: matchRegex(/^presentation/),
+      handler: async (match, el) => {
+        const remId = el.remData._id;
+        const presentationId = `deck-${remId}`;
+
+        async function buildSlide(slideRemId) {
+          const slideRem = await db.get("quanta", slideRemId);
+          const bulletPoints = await Promise.all(
+            slideRem.children.map(async (childId) => await getRemHTML(childId))
+          );
+          // TODO: Fragments should be applied with tags
+          return `<h2>${await getRemText(
+            slideRemId
+          )}</h2><ul>${bulletPoints
+            .map((p) => `<li class="fragment">${p}</li>`)
+            .join("")}</ul>`;
+        }
+
+        async function buildPresentationContent(rootRem) {
+          console.info(rootRem.children);
+          const slides = await Promise.all(
+            rootRem.children.map(async (childId) => await buildSlide(childId))
+          );
+          console.info("slides", slides);
+          return `<div class="slides">${slides
+            .map((slide) => `<section>${slide}</section>`)
+            .join("\n")}</div>`;
+        }
+
+        const presentationTemplate = document.createElement("template");
+        presentationTemplate.innerHTML = `<div class="reveal">
+      ${await buildPresentationContent(el.remData)}
+    </div>`;
+        const presentation = presentationTemplate.content.firstChild;
+        presentation.id = presentationId;
+        window.presentation = presentation;
+        const deck = new Reveal(presentation, {
+          embedded: true,
+          keyboardCondition: "focused",
+        });
+        deck.initialize();
+        return presentation;
+      },
     },
     {
       matcher: matchRegex(/^chucknorris/),
