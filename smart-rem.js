@@ -451,6 +451,57 @@ async function f() {
       },
     },
     {
+      dependencies: [
+        "https://d3js.org/d3.v3.min.js",
+        "https://cdn.jsdelivr.net/cal-heatmap/3.3.10/cal-heatmap.js",
+        "https://cdn.jsdelivr.net/cal-heatmap/3.3.10/cal-heatmap.css",
+      ],
+      init: function () {
+        mermaid.initialize({
+          securityLevel: "loose",
+        });
+      },
+      matcher: matchRegex(/^heatmap/),
+      handler: async (match, el) => {
+        const cards = await db.getAll("cards");
+        let practice_sessions = {};
+        for (let card of cards) {
+          if (!card.h) continue;
+          for (let hi of card.h) {
+            let t = typeof hi.date === "number" ? hi.date : Date.parse(hi.date);
+            t /= 1000;
+            practice_sessions[t] = practice_sessions[t]
+              ? practice_sessions[t] + 1
+              : 1;
+          }
+        }
+        const heatmapNode = document.createElement("div");
+        heatmapNode.className = "heatmap";
+        const today = new Date();
+        let start = new Date();
+        start.setMonth(start.getMonth() - 11);
+        start.setDate(1);
+        const cal = new CalHeatMap();
+        cal.init({
+          // itemSelector: '#' + targetContainerId,
+          itemSelector: heatmapNode,
+          domain: "month",
+          subDomain: "day",
+          data: practice_sessions,
+          start: start,
+          cellSize: 10,
+          range: 12,
+          legend: [20, 40, 60, 80],
+          legendVerticalPosition: "center",
+          legendHorizontalPosition: "right",
+          legendOrientation: "vertical",
+          tooltip: true,
+          highlight: ["now", today],
+        });
+        return heatmapNode;
+      },
+    },
+    {
       matcher: matchRegex(/^chucknorris/),
       handler: async (match) => {
         const resp = await fetch("https://api.chucknorris.io/jokes/random");
