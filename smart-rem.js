@@ -491,9 +491,21 @@ async function f() {
   }
 
   function makeResult(resultMarkup) {
-    const resultTemplate = document.createElement("template");
-    resultTemplate.innerHTML = `<div class="smart-rem-result">${resultMarkup}</div>`;
-    return resultTemplate.content.firstChild;
+    const smartRemResult = document.createElement("div");
+    smartRemResult.classList.add("smart-rem-result");
+    // TODO: Add custom result classes here, e.g. to float right.
+    // TODO: Maybe I should bundle <styles> with the smart rems as well. (Research CSS modules)
+
+    if (typeof resultMarkup === "string") {
+      const resultTemplate = document.createElement("template");
+      resultTemplate.innerHTML = resultMarkup;
+      smartRemResult.appendChild(resultTemplate.content.firstChild);
+    } else {
+      // HTMLNode
+      smartRemResult.appendChild(resultMarkup);
+    }
+
+    return smartRemResult;
   }
 
   async function evaluateSmartRem(el) {
