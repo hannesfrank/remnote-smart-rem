@@ -254,6 +254,46 @@ async function f() {
         `<iframe src="https://${match[1]}" width="750" height="500"></iframe>`,
     },
     {
+      // More embeds than simple tweets are possible, like showing the timeline of someone
+      // https://developer.twitter.com/en/docs/twitter-for-websites/javascript-api/guides/scripting-factory-functions
+      init: function () {
+        window.twttr = (function (d, s, id) {
+          var js,
+            fjs = d.getElementsByTagName(s)[0],
+            t = window.twttr || {};
+          if (d.getElementById(id)) return t;
+          js = d.createElement(s);
+          js.id = id;
+          js.src = "https://platform.twitter.com/widgets.js";
+          fjs.parentNode.insertBefore(js, fjs);
+
+          t._e = [];
+          t.ready = function (f) {
+            t._e.push(f);
+          };
+          console.info("initialized twitter");
+
+          return t;
+        })(document, "script", "twitter-wjs");
+      },
+      matcher: matchRegex(/^twitter:\s*(.+)/),
+      handler: async (match) => {
+        console.info("rendering twitter");
+        twttr.widgets
+          .createTweet(
+            "511181794914627584",
+            document.getElementById("twitter-tweet"),
+            {
+              align: "left",
+            }
+          )
+          .then(function (el) {
+            console.info("Tweet displayed.");
+          })
+          .catch(console.error);
+      },
+    },
+    {
       matcher: matchRegex(/^weather:\s*(.+)/),
       handler: async (match) =>
         `<img src="https://wttr.in/${match[1]}_tpq0.png" />`,
