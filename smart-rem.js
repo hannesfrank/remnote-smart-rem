@@ -266,6 +266,57 @@ async function f() {
   }
 
   let enabledSmartCommands = [
+    {
+      // TODO: Listen to changes of child rems
+      // TODO: Can an API be used to allow screenshots?
+      matcher: matchRegex(/^\s*github-issue/),
+      handler: async (match, el) => {
+        // user/repo
+        // title
+        // content
+        // content
+
+        // Adapted from https://github.com/sindresorhus/new-github-issue-url
+        function createIssueURL(userRepo, title, body) {
+          const repoUrl = `https://github.com/${userRepo}`;
+
+          const url = new URL(`${repoUrl}/issues/new`);
+
+          const params = [
+            "body",
+            "title",
+            "labels",
+            "template",
+            "milestone",
+            "assignee",
+            "projects",
+          ];
+
+          url.searchParams.set("title", title);
+          url.searchParams.set("body", body);
+
+          return url.toString();
+        }
+
+        const children = await Promise.all(
+          el.remData.children.map(async (childId) => await getRemText(childId))
+        );
+
+        if (children.length < 3) {
+          return `<p>Specify at least user/repo, title and content as children of this rem.</p>`;
+        }
+        const [userRepo, title, ...body] = children;
+        console.info(body);
+        const url = createIssueURL(
+          userRepo.trim(),
+          title.trim(),
+          body.join("\n")
+        );
+
+        // TODO: Fragments should be applied with tags
+        return `<p>Report issue for github.com/${userRepo}: <a href="${url}" target="_blank"><button>Create Issue</button></a></p>`;
+      },
+    },
   ];
 
   // TODO: Each smart rem should also get a `name` which is added as class to the result node.
@@ -388,7 +439,7 @@ async function f() {
           const bulletPoints = await Promise.all(
             slideRem.children.map(async (childId) => await getRemHTML(childId))
           );
-          // TODO: Fragments should be applied with tags
+          // TODO: Animation Fragments should be configurable with tags
           return `<h2>${await getRemText(
             slideRemId
           )}</h2><ul>${bulletPoints
