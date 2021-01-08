@@ -47,7 +47,9 @@ function hasReference(rem, refId) {
   return false;
 }
 
-function hasTag(rem, tagId) {}
+function hasTag(rem, tagId) {
+  /* TODO: Not implemented */
+}
 
 /**
  * returns query AST as a json object representing the postorder
@@ -132,6 +134,61 @@ async function resolveQuery(queryAST) {
 
 // ============= Smart Rem =================
 
+// ---------- Smart Rem Util ---------------
+
+// Return promises for each dependency
+// Check if link elements also have an onload event
+function addDependency(url) {
+  if (url.endsWith(".css")) {
+    return addCSSDependency(url);
+  } else if (url.endsWith(".js")) {
+    return addJsDependency(url);
+  } else {
+    // TODO: do error handling here
+    return new Promise((_, reject) => {
+      console.error("Could not load dependency", url);
+      reject(url);
+    });
+  }
+}
+
+function addCSSDependency(url) {
+  return new Promise((resolve, reject) => {
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.type = "text/css";
+    link.href = url;
+    document.getElementsByTagName("head")[0].appendChild(link);
+    // For now I do not wait on loading them since it is not that
+    // important for CSS to arive first.
+    resolve();
+  });
+}
+
+function addJsDependency(url) {
+  return new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = url;
+    script.addEventListener("load", resolve);
+    script.addEventListener("error", (e) => reject(e.error));
+    document.getElementsByTagName("head")[0].appendChild(script);
+  });
+
+  // https://stackoverflow.com/questions/8578617/inject-a-script-tag-with-remote-src-and-wait-for-it-to-execute
+  // (function(d, s, id){
+  //     var js, fjs = d.getElementsByTagName(s)[0];
+  //     if (d.getElementById(id)){ return; }
+  //     js = d.createElement(s); js.id = id;
+  //     js.onload = function(){
+  //         // remote script has loaded
+  //     };
+  //     js.src = "//connect.facebook.net/en_US/sdk.js";
+  //     fjs.parentNode.insertBefore(js, fjs);
+  // }(document, 'script', 'facebook-jssdk'));
+}
+
+// ------- Smart Rem Definitions -----------
+
 async function f() {
   const REM_ID_LENGTH = 17;
   const SMART_REM_PREFIX = ">>>";
@@ -215,13 +272,22 @@ async function f() {
         return `<p>🧔 ${json.value}</p>`;
       },
     },
+    // TODO: Dependency injection like this does not work. Use `dependencies` key for this.
+    //     {
+    //       matcher: matchRegex(/^weatherwidget/),
+    //       handler: async (match) => {
+    //         return `<a class="weatherwidget-io" href="https://forecast7.com/de/51d0513d74/dresden/" data-label_1="DRESDEN" data-label_2="Wetter" data-font="Fira Sans" data-icons="Climacons Animated" data-mode="Forecast" data-days="5" data-theme="dark" >DRESDEN Wetter</a>
+    // <script>
+    // !function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src='https://weatherwidget.io/js/widget.min.js';fjs.parentNode.insertBefore(js,fjs);}}(document,'script','weatherwidget-io-js');
+    // </script>`;
+    //       },
+    //     },
     {
       matcher: matchRegex(/^current ip/),
       handler: async (match) => {
         const resp = await fetch("https://api.ipify.org/?format=json");
         const json = await resp.json();
-        // return `<p>💻 ${json.ip}</p>`;
-        return `<p>💻 1.3.3.7</p>`;
+        return `<p>💻 ${json.ip}</p>`;
       },
     },
     {
@@ -250,6 +316,9 @@ async function f() {
       },
     },
     {
+      dependencies: [
+        "https://cdnjs.cloudflare.com/ajax/libs/showdown/1.9.1/showdown.min.js",
+      ],
       matcher: matchRegex(/^markdown:\s*(.+)/s),
       handler: async (match) => {
         const markdown = match[1];
@@ -399,16 +468,25 @@ async function f() {
     setResult(el, "? Command not found!");
   }
 
+  const dependencies = Array.prototype.concat(
+    ...smartCommands.map((sr) => sr.dependencies).filter((d) => d)
+  );
+  console.info("Loading dependencies: ", dependencies);
   Promise.all([
     import("https://unpkg.com/idb?module"),
-    fetch("https://unpkg.com/showdown")
-      .then((response) => response.text())
-      .then((text) => Function(text)),
+    ...dependencies.map(addDependency),
     // Somehow this import does not work... I'll use builtin eval for now
     //fetch("https://unpkg.com/bigeval").then(response=>response.text()).then(text=>Function(text))
-  ]).then(async ([idb, sd]) => {
-    sd();
+  ]).then(async ([idb]) => {
     db = await idb.openDB("lnotes", 24);
+
+    // Init dependencies
+    // TODO: Make sure init blocks are reentrant while development
+    for (const smartCommand of smartCommands) {
+      if (smartCommand.init) {
+        smartCommand.init();
+      }
+    }
 
     let rems = await findAllRem();
     rems.map(resetRem);
