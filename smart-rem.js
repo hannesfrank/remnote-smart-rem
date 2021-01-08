@@ -265,6 +265,7 @@ async function f() {
     };
   }
 
+  // TODO: Each smart rem should also get a `name` which is added as class to the result node.
   const smartCommands = [
     {
       matcher: matchRegex(/^\s*query-rem-json:(.*)/),
@@ -416,6 +417,37 @@ async function f() {
         });
         deck.initialize();
         return presentation;
+      },
+    },
+    {
+      dependencies: [
+        "https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js",
+      ],
+      init: function () {
+        mermaid.initialize({
+          securityLevel: "loose",
+        });
+      },
+      matcher: matchRegex(/^mermaid/),
+      handler: async (match, el) => {
+        const codeBlocks = el.remData.key.filter(
+          (part) => part.i && part.i === "o"
+        );
+        if (codeBlocks.length < 1) {
+          return `<p>No code block found!</p>`;
+        }
+        const graphDefinition = codeBlocks[0].text;
+        const mermaidId = `mermaid-${el.remData._id}`;
+        const mermaidNode =
+          document.getElementById(mermaidId) || document.createElement("div");
+        console.info(mermaidNode);
+        mermaidNode.id = mermaidId;
+
+        function insertSvg(svgCode, bindFunctions) {
+          mermaidNode.innerHTML = svgCode;
+        }
+        mermaid.render(mermaidId + "-graph", graphDefinition, insertSvg);
+        return mermaidNode;
       },
     },
     {
@@ -634,6 +666,8 @@ async function f() {
     setResult(el, "? Command not found!");
   }
 
+  // TODO: Prevent reloading the dependencies when rerunning the script.
+  // E.g. generate a unique id for each script url and check if it is already there.
   const dependencies = Array.prototype.concat(
     ...smartCommands.map((sr) => sr.dependencies).filter((d) => d)
   );
