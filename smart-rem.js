@@ -265,8 +265,11 @@ async function f() {
     };
   }
 
+  let enabledSmartCommands = [
+  ];
+
   // TODO: Each smart rem should also get a `name` which is added as class to the result node.
-  const smartCommands = [
+  const allSmartCommands = [
     {
       matcher: matchRegex(/^\s*query-rem-json:(.*)/),
       handler: async (match, el) => {
@@ -706,7 +709,7 @@ async function f() {
   }
 
   async function evaluateSmartRem(el) {
-    for (const smartCommand of smartCommands) {
+    for (const smartCommand of enabledSmartCommands) {
       const match = smartCommand.matcher(el);
       if (match) {
         const result = await smartCommand.handler(match, el);
@@ -717,10 +720,14 @@ async function f() {
     setResult(el, "? Command not found!");
   }
 
+  // Comment this when developing smart rem and remove after there are options which smart rems to enable
+  // This makes it faster to load since not as many dependencies have to be downloaded
+  enabledSmartCommands = [...enabledSmartCommands, ...allSmartCommands];
+
   // TODO: Prevent reloading the dependencies when rerunning the script.
   // E.g. generate a unique id for each script url and check if it is already there.
   const dependencies = Array.prototype.concat(
-    ...smartCommands.map((sr) => sr.dependencies).filter((d) => d)
+    ...enabledSmartCommands.map((sr) => sr.dependencies).filter((d) => d)
   );
   console.info("Loading dependencies: ", dependencies);
   Promise.all([
@@ -733,7 +740,7 @@ async function f() {
 
     // Init dependencies
     // TODO: Make sure init blocks are reentrant while development
-    for (const smartCommand of smartCommands) {
+    for (const smartCommand of enabledSmartCommands) {
       if (smartCommand.init) {
         smartCommand.init();
       }
