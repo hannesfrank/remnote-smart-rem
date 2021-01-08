@@ -304,7 +304,7 @@ async function f() {
         const result = eval(expression);
 
         console.info("Calc: ", match, " = ", result);
-        return `<p>${expression} = </p><p>${result}</p>`;
+        return `<p>${expression} = ${result}</p>`;
       },
     },
     {
@@ -645,7 +645,7 @@ async function f() {
     if (typeof resultMarkup === "string") {
       const resultTemplate = document.createElement("template");
       resultTemplate.innerHTML = resultMarkup;
-      smartRemResult.appendChild(resultTemplate.content.firstChild);
+      smartRemResult.append(...resultTemplate.content.children);
     } else {
       // HTMLNode
       smartRemResult.appendChild(resultMarkup);
