@@ -267,6 +267,57 @@ async function f() {
 
   let enabledSmartCommands = [
     {
+      dependencies: [
+        "https://cdn.jsdelivr.net/npm/reveal.js/dist/reveal.js",
+        "https://cdn.jsdelivr.net/npm/reveal.js/dist/reveal.css",
+        "https://cdn.jsdelivr.net/npm/reveal.js/dist/theme/white.css",
+        //"https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.13.1/styles/zenburn.min.css",
+      ],
+      matcher: matchRegex(/^presentation/),
+      handler: async (match, el) => {
+        const remId = el.remData._id;
+        const presentationId = `deck-${remId}`;
+
+        async function buildSlide(slideRemId) {
+          const slideRem = await db.get("quanta", slideRemId);
+          const bulletPoints = await Promise.all(
+            slideRem.children.map(async (childId) => await getRemHTML(childId))
+          );
+          // TODO: Animation Fragments should be configurable with tags
+          return `<h2>${await getRemText(
+            slideRemId
+          )}</h2><ul>${bulletPoints
+            .map((p) => `<li class="fragment">${p}</li>`)
+            .join("")}</ul>`;
+        }
+
+        async function buildPresentationContent(rootRem) {
+          console.info(rootRem.children);
+          const slides = await Promise.all(
+            rootRem.children.map(async (childId) => await buildSlide(childId))
+          );
+          console.info("slides", slides);
+          return `<div class="slides">${slides
+            .map((slide) => `<section>${slide}</section>`)
+            .join("\n")}</div>`;
+        }
+
+        const presentationTemplate = document.createElement("template");
+        presentationTemplate.innerHTML = `<div class="reveal">
+      ${await buildPresentationContent(el.remData)}
+    </div>`;
+        const presentation = presentationTemplate.content.firstChild;
+        presentation.id = presentationId;
+        window.presentation = presentation;
+        const deck = new Reveal(presentation, {
+          embedded: true,
+          keyboardCondition: "focused",
+        });
+        deck.initialize();
+        return presentation;
+      },
+    },
+    {
       // TODO: Listen to changes of child rems
       // TODO: Can an API be used to allow screenshots?
       matcher: matchRegex(/^\s*github-issue/),
@@ -773,7 +824,7 @@ async function f() {
 
   // Comment this when developing smart rem and remove after there are options which smart rems to enable
   // This makes it faster to load since not as many dependencies have to be downloaded
-  enabledSmartCommands = [...enabledSmartCommands, ...allSmartCommands];
+  // enabledSmartCommands = [...enabledSmartCommands, ...allSmartCommands];
 
   // TODO: Prevent reloading the dependencies when rerunning the script.
   // E.g. generate a unique id for each script url and check if it is already there.
