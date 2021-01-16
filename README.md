@@ -221,7 +221,7 @@ Yes, Smart Rem is comparable to Roam Research's [Smart Blocks](https://roamresea
 > SmartBlocks adding a new dimension to Roam, making it a
 > programmable note-taking tool for networked thought.
 
-And I was obviously inspired by it: Some ideas are/will be stolen because they are just too good (e.g. ability to create Algorithms directly in your knowledge graph (!) and - in lack of a better idea - the name), some discoveries where made independently and I'm sure the still unpublished parts of both project visions have a significant intersection as well.
+And I was obviously inspired by it: Some ideas are/will be borrowed because they are just too good (e.g. ability to no-code define smart blocks directly in your knowledge graph (!) and obviously - in lack of a better idea - the name), some things will be different (Interactivity/REPL).
 
 Smart Rems was born because of the limitations of RemNotes Plugin system. I wanted to
 
@@ -235,9 +235,9 @@ Smart Rem is different from SmartBlocks in a few aspects:
 
 **Smartness Definition:**
 
-- SmartBlocks are stored/edited directly in your knowledge base
-- Smart Rem are JavaScript code outside your knowledge base at the moment
-  - The idea is to share them through RemNote Library at some point
+- SmartBlocks are stored/edited directly in your knowledge base. If is no-code/low-code which allows even non-programmers to define them.
+- Smart Rem are plain JavaScript code outside your knowledge base at the moment, but not necessarily forever.
+  - The idea is to share them through RemNote Library at some point.
 
 **Result placement and form:**
 
@@ -257,13 +257,13 @@ Smart Rem is different from SmartBlocks in a few aspects:
 
 **Maturity:**
 
-- SmartBlocks is usable and has quite a lot of feature
-- Smart Rem is barely 1k lines of code
+- SmartBlocks is usable and has quite a lot of cool features.
+- Smart Rem is barely 1k lines of code and is just a proof of concept. It is not stable at all!
 
 **Philosopy/Vision:** (I'm not confident in the correctness of this part!) This probably mirrors the philosophy of RemNote and RoamResearch.
 
-- SmartBlocks (I think?) trys to automate note-taking and guide thinking with Algorithms for Thought.
-- RemNote's vision `is to help increase and develop of knowledge in society and thereby drive scientific advancement forward by building tools to help humans learn and think.` In accordance with this an [integrated learning experience](#integrated-learning-environment-ile) will be a big part of this.
+- SmartBlocks (I think?) trys to automate note-taking with dynamic templates and guide thinking with Algorithms for Thought.
+- RemNote's vision is _"to help increase and develop of knowledge in society and thereby drive scientific advancement forward by building tools to help humans learn and think."_ In accordance with this an [integrated learning experience](#integrated-learning-environment-ile) and knowledge exploration will play a big role in Smart Rem.
 
 ## Other Things
 

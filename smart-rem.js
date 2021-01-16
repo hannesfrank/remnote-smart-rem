@@ -1,3 +1,12 @@
+function getSettings() {
+  return {
+    DATABASE_NAME: "lnotes",
+    DATABASE_VERSION: 24,
+    SMART_REM_PREFIX: ">>>",
+    SMART_VIEW_REM_ID: "SOMETHING", // Rem tagged with this Rem are considered as Smart Views
+  };
+}
+
 // =============== Query explorations ================
 function remContent(rem) {
   return [...rem.key, ...(rem.value || [])];
@@ -253,8 +262,9 @@ function addJsDependency(url) {
 // ------- Smart Rem Definitions -----------
 
 async function f() {
+  const settings = getSettings();
   const REM_ID_LENGTH = 17;
-  const SMART_REM_PREFIX = ">>>";
+  const SMART_REM_PREFIX = settings.SMART_REM_PREFIX;
 
   function matchRegex(regex) {
     return (el) => {
@@ -266,57 +276,6 @@ async function f() {
   }
 
   let enabledSmartCommands = [
-    {
-      dependencies: [
-        "https://cdn.jsdelivr.net/npm/reveal.js/dist/reveal.js",
-        "https://cdn.jsdelivr.net/npm/reveal.js/dist/reveal.css",
-        "https://cdn.jsdelivr.net/npm/reveal.js/dist/theme/white.css",
-        //"https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.13.1/styles/zenburn.min.css",
-      ],
-      matcher: matchRegex(/^presentation/),
-      handler: async (match, el) => {
-        const remId = el.remData._id;
-        const presentationId = `deck-${remId}`;
-
-        async function buildSlide(slideRemId) {
-          const slideRem = await db.get("quanta", slideRemId);
-          const bulletPoints = await Promise.all(
-            slideRem.children.map(async (childId) => await getRemHTML(childId))
-          );
-          // TODO: Animation Fragments should be configurable with tags
-          return `<h2>${await getRemText(
-            slideRemId
-          )}</h2><ul>${bulletPoints
-            .map((p) => `<li class="fragment">${p}</li>`)
-            .join("")}</ul>`;
-        }
-
-        async function buildPresentationContent(rootRem) {
-          console.info(rootRem.children);
-          const slides = await Promise.all(
-            rootRem.children.map(async (childId) => await buildSlide(childId))
-          );
-          console.info("slides", slides);
-          return `<div class="slides">${slides
-            .map((slide) => `<section>${slide}</section>`)
-            .join("\n")}</div>`;
-        }
-
-        const presentationTemplate = document.createElement("template");
-        presentationTemplate.innerHTML = `<div class="reveal">
-      ${await buildPresentationContent(el.remData)}
-    </div>`;
-        const presentation = presentationTemplate.content.firstChild;
-        presentation.id = presentationId;
-        window.presentation = presentation;
-        const deck = new Reveal(presentation, {
-          embedded: true,
-          keyboardCondition: "focused",
-        });
-        deck.initialize();
-        return presentation;
-      },
-    },
     {
       // TODO: Listen to changes of child rems
       // TODO: Can an API be used to allow screenshots?
@@ -541,6 +500,7 @@ async function f() {
         if (codeBlocks.length < 1) {
           return `<p>No code block found!</p>`;
         }
+
         const graphDefinition = codeBlocks[0].text;
         const mermaidId = `mermaid-${el.remData._id}`;
         const mermaidNode =
@@ -824,7 +784,8 @@ async function f() {
 
   // Comment this when developing smart rem and remove after there are options which smart rems to enable
   // This makes it faster to load since not as many dependencies have to be downloaded
-  // enabledSmartCommands = [...enabledSmartCommands, ...allSmartCommands];
+  //
+  enabledSmartCommands = [...enabledSmartCommands, ...allSmartCommands];
 
   // TODO: Prevent reloading the dependencies when rerunning the script.
   // E.g. generate a unique id for each script url and check if it is already there.
@@ -838,7 +799,7 @@ async function f() {
     // Somehow this import does not work... I'll use builtin eval for now
     //fetch("https://unpkg.com/bigeval").then(response=>response.text()).then(text=>Function(text))
   ]).then(async ([idb]) => {
-    db = await idb.openDB("lnotes", 24);
+    db = await idb.openDB(settings.DATABASE_NAME, settings.DATABASE_VERSION);
 
     // Init dependencies
     // TODO: Make sure init blocks are reentrant while development
